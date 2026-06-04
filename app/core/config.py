@@ -2,31 +2,40 @@
 # Pattern: Config Object Pattern — environment-specific config classes
 
 import os
+from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
+def _build_db_uri():
+    """
+    URL-encode the password so special characters like @, #, $ don't
+    break the SQLAlchemy connection string.
+    Example: Fahdil@1  →  Fahdil%401
+    """
+    user     = os.getenv('DB_USER',     'root')
+    password = quote_plus(os.getenv('DB_PASSWORD', ''))   # ← encodes @ # $ etc.
+    host     = os.getenv('DB_HOST',     'localhost')
+    port     = os.getenv('DB_PORT',     '3306')
+    name     = os.getenv('DB_NAME',     'apexspeech_db')
+    return f"mysql+pymysql://{user}:{password}@{host}:{port}/{name}?charset=utf8mb4"
+
+
 class BaseConfig:
     """Base configuration — all shared settings."""
-    SECRET_KEY                  = os.getenv('SECRET_KEY', 'dev-secret-key')
-    JWT_SECRET_KEY              = os.getenv('JWT_SECRET_KEY', 'jwt-dev-secret')
-    JWT_ACCESS_TOKEN_EXPIRES    = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES', 3600))
-    JWT_REFRESH_TOKEN_EXPIRES   = int(os.getenv('JWT_REFRESH_TOKEN_EXPIRES', 2592000))
+    SECRET_KEY                = os.getenv('SECRET_KEY',       'dev-secret-key')
+    JWT_SECRET_KEY            = os.getenv('JWT_SECRET_KEY',   'jwt-dev-secret')
+    JWT_ACCESS_TOKEN_EXPIRES  = int(os.getenv('JWT_ACCESS_TOKEN_EXPIRES',  3600))
+    JWT_REFRESH_TOKEN_EXPIRES = int(os.getenv('JWT_REFRESH_TOKEN_EXPIRES', 2592000))
 
-    DB_HOST     = os.getenv('DB_HOST', 'localhost')
-    DB_PORT     = os.getenv('DB_PORT', '3306')
-    DB_NAME     = os.getenv('DB_NAME', 'apexspeech_db')
-    DB_USER     = os.getenv('DB_USER', 'root')
+    DB_HOST     = os.getenv('DB_HOST',     'localhost')
+    DB_PORT     = os.getenv('DB_PORT',     '3306')
+    DB_NAME     = os.getenv('DB_NAME',     'apexspeech_db')
+    DB_USER     = os.getenv('DB_USER',     'root')
     DB_PASSWORD = os.getenv('DB_PASSWORD', '')
 
-    SQLALCHEMY_DATABASE_URI = (
-        f"mysql+pymysql://{os.getenv('DB_USER','root')}:"
-        f"{os.getenv('DB_PASSWORD','')}@"
-        f"{os.getenv('DB_HOST','localhost')}:"
-        f"{os.getenv('DB_PORT','3306')}/"
-        f"{os.getenv('DB_NAME','apexspeech_db')}?charset=utf8mb4"
-    )
+    SQLALCHEMY_DATABASE_URI        = _build_db_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_recycle': 280,
@@ -35,11 +44,11 @@ class BaseConfig:
         'max_overflow': 20,
     }
 
-    OPENAI_API_KEY  = os.getenv('OPENAI_API_KEY', '')
-    HUME_API_KEY    = os.getenv('HUME_API_KEY', '')
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    HUME_API_KEY   = os.getenv('HUME_API_KEY',   '')
 
-    UPLOAD_FOLDER       = os.getenv('UPLOAD_FOLDER', 'uploads/audio')
-    MAX_CONTENT_LENGTH  = int(os.getenv('MAX_CONTENT_LENGTH', 52428800))
+    UPLOAD_FOLDER      = os.getenv('UPLOAD_FOLDER', 'uploads/audio')
+    MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 52428800))
 
     ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 
