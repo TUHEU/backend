@@ -234,14 +234,19 @@ class AICoachingTip(BaseModel):
         }
 
 
-class RefreshToken(BaseModel):
-    """JWT refresh token store."""
+class RefreshToken(db.Model):
+    """
+    JWT refresh token store.
+    Does NOT extend BaseModel — the refresh_tokens table has no updated_at column.
+    """
     __tablename__ = 'refresh_tokens'
 
-    user_id    = db.Column(db.Integer,      db.ForeignKey('users.id'), nullable=False, index=True)
-    token_hash = db.Column(db.String(255),  nullable=False, unique=True)
-    expires_at = db.Column(db.DateTime,     nullable=False)
-    revoked    = db.Column(db.Boolean,      nullable=False, default=False)
+    id         = db.Column(db.Integer,     primary_key=True, autoincrement=True)
+    user_id    = db.Column(db.Integer,     db.ForeignKey('users.id'), nullable=False, index=True)
+    token_hash = db.Column(db.String(255), nullable=False, unique=True)
+    expires_at = db.Column(db.DateTime,    nullable=False)
+    revoked    = db.Column(db.Boolean,     nullable=False, default=False)
+    created_at = db.Column(db.DateTime,    server_default=db.func.now(), nullable=False)
 
     @property
     def is_expired(self):

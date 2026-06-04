@@ -22,7 +22,7 @@ class LoginSchema(Schema):
 
 class ScriptCreateSchema(Schema):
     title              = fields.Str(required=True, validate=validate.Length(min=1, max=200))
-    raw_text           = fields.Str(required=True, validate=validate.Length(min=10))
+    raw_text           = fields.Str(required=True, validate=validate.Length(min=1))
     audience_type      = fields.Str(load_default='General',
                                     validate=validate.OneOf([
                                         'General','Executives','Investors',
@@ -33,7 +33,7 @@ class ScriptCreateSchema(Schema):
 
 class ScriptUpdateSchema(Schema):
     title              = fields.Str(validate=validate.Length(min=1, max=200))
-    raw_text           = fields.Str(validate=validate.Length(min=10))
+    raw_text           = fields.Str(validate=validate.Length(min=1))
     audience_type      = fields.Str(validate=validate.OneOf([
                              'General','Executives','Investors',
                              'Students','Media','Clients','Wedding'

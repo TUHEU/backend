@@ -80,7 +80,9 @@ class OpenAIProvider(AIProvider):
         return {}
 
     def apexify_script(self, raw_text: str) -> str:
-        """Refine raw speech text with GPT-4o."""
+        """Refine raw speech text with GPT-4o. Falls back to mock if no API key."""
+        if not cfg.OPENAI_API_KEY or cfg.OPENAI_API_KEY.startswith('sk-your'):
+            return self._mock_apexify(raw_text)
         try:
             response = self.client.chat.completions.create(
                 model='gpt-4o',
@@ -94,10 +96,29 @@ class OpenAIProvider(AIProvider):
             return response.choices[0].message.content.strip()
         except Exception as e:
             logger.error(f"GPT-4o apexify error: {e}")
-            raise
+            return self._mock_apexify(raw_text)
+
+    def _mock_apexify(self, raw_text: str) -> str:
+        """Mock apexification — used when no OpenAI key is configured."""
+        sentences = [s.strip() for s in raw_text.replace('!','.').replace('?','.').split('.') if s.strip()]
+        if not sentences:
+            return raw_text
+        hook = f"The moment is now — and what I am about to share will change how you see everything."
+        middle = '. '.join(
+            s[0].upper() + s[1:] if s else s
+            for s in sentences[1:] if s
+        )
+        cta = "The question is not whether you are ready. The question is: will you act?"
+        parts = [hook]
+        if middle:
+            parts.append(middle + '.')
+        parts.append(cta)
+        return ' '.join(parts)
 
     def generate_qa(self, script_text: str) -> list:
-        """Generate 5 Q&A pairs for a script."""
+        """Generate 5 Q&A pairs. Falls back to mock if no API key."""
+        if not cfg.OPENAI_API_KEY or cfg.OPENAI_API_KEY.startswith('sk-your'):
+            return self._mock_qa(script_text)
         try:
             response = self.client.chat.completions.create(
                 model='gpt-4o',
@@ -113,9 +134,31 @@ class OpenAIProvider(AIProvider):
             return json.loads(raw)
         except Exception as e:
             logger.error(f"GPT-4o Q&A error: {e}")
-            raise
+            return self._mock_qa(script_text)
+
+    def _mock_qa(self, script_text: str) -> list:
+        """Mock Q&A — used when no OpenAI key is configured."""
+        return [
+            {"question": "What is the main message of your speech?",
+             "suggested_answer": "Summarise your core argument in one powerful sentence that your audience will remember.",
+             "difficulty": "easy"},
+            {"question": "How does your proposal benefit the audience directly?",
+             "suggested_answer": "Speak to the specific pain point your audience faces and explain the tangible value you deliver.",
+             "difficulty": "medium"},
+            {"question": "What evidence supports your key claims?",
+             "suggested_answer": "Reference specific data, case studies, or personal experience to back up your statements.",
+             "difficulty": "medium"},
+            {"question": "How do you respond to critics who disagree with your position?",
+             "suggested_answer": "Acknowledge the opposing view respectfully, then redirect with stronger counter-evidence.",
+             "difficulty": "hard"},
+            {"question": "What is the single action you want the audience to take right now?",
+             "suggested_answer": "Be precise — one clear, immediate, and achievable call to action closes with maximum impact.",
+             "difficulty": "medium"},
+        ]
 
     def generate_coaching_tips(self, session_data: dict) -> list:
+        if not cfg.OPENAI_API_KEY or cfg.OPENAI_API_KEY.startswith('sk-your'):
+            return self._mock_coaching_tips(session_data)
         prompt = (
             f"Based on this speech session:\n"
             f"- Confidence: {session_data.get('confidence_score')}%\n"
@@ -142,7 +185,29 @@ class OpenAIProvider(AIProvider):
             return json.loads(raw)
         except Exception as e:
             logger.error(f"Coaching tips error: {e}")
-            return []
+            return self._mock_coaching_tips(session_data)
+
+    def _mock_coaching_tips(self, session_data: dict) -> list:
+        conf = session_data.get('confidence_score', 70)
+        fill = session_data.get('filler_word_count', 0)
+        tips = []
+        if conf >= 70:
+            tips.append({"tip_type":"strength","title":"Strong Vocal Presence",
+                "body":"Your confidence score shows you are projecting authority. Keep maintaining this commanding tone throughout your delivery.","icon_emoji":"💪"})
+        else:
+            tips.append({"tip_type":"improvement","title":"Build Vocal Confidence",
+                "body":"Slow down your pace by 20%. Deliberate pauses signal confidence more than speed.","icon_emoji":"🎯"})
+        tips.append({"tip_type":"strength","title":"Consistent Energy",
+                "body":"Your enthusiasm remained steady. Audiences respond well to sustained energy — it keeps them engaged.","icon_emoji":"🔥"})
+        if fill > 3:
+            tips.append({"tip_type":"improvement","title":f"Reduce Filler Words ({fill} detected)",
+                "body":"Replace each filler word with a 2-second deliberate pause. Silence is a power tool, not a weakness.","icon_emoji":"🎯"})
+        else:
+            tips.append({"tip_type":"strength","title":"Clean Delivery",
+                "body":"Very few filler words detected. This signals preparation and command of your material.","icon_emoji":"✨"})
+        tips.append({"tip_type":"improvement","title":"Vary Your Sentence Length",
+                "body":"Mix short punchy sentences with longer ones for rhythm. Short. Sharp. Impact. Then a longer sentence that builds and carries the audience forward.","icon_emoji":"📊"})
+        return tips[:4]
 
 
 class HumeAIProvider:
