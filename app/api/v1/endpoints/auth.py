@@ -1,67 +1,35 @@
-# app/api/v1/endpoints/auth.py
-
 from flask import Blueprint, request
-from marshmallow import ValidationError
 from app.services.services import AuthService
-from app.schemas.schemas import RegisterSchema, LoginSchema
-from app.utils.response import ApiResponse
-from app.core.security import jwt_required_custom, TokenManager
+from app.utils.response import ok, created, err, unauth
+from app.core.security import jwt_required, current_user_id
+from app.models.models import User
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
-_service = AuthService()
-
+_svc    = AuthService()
 
 @auth_bp.post('/register')
 def register():
-    try:
-        data = RegisterSchema().load(request.get_json() or {})
-    except ValidationError as e:
-        return ApiResponse.error('Validation failed', 422, e.messages)
-
-    result = _service.register(data['full_name'], data['email'], data['password'])
-    if not result['success']:
-        return ApiResponse.error(result['message'], result.get('code', 400))
-
-    return ApiResponse.created({
-        'user':          result['user'],
-        'access_token':  result['access_token'],
-        'refresh_token': result['refresh_token'],
-    }, 'Account created')
-
+    d = request.get_json() or {}
+    if not all([d.get('username'), d.get('email'), d.get('password')]):
+        return err('username, email and password required', 422)
+    if len(d['password']) < 6:
+        return err('Password min 6 characters', 422)
+    r = _svc.register(d['username'], d['email'], d['password'])
+    if not r['ok']: return err(r['msg'], r['code'])
+    return created({'user': r['user'], 'access_token': r['token']})
 
 @auth_bp.post('/login')
 def login():
-    try:
-        data = LoginSchema().load(request.get_json() or {})
-    except ValidationError as e:
-        return ApiResponse.error('Validation failed', 422, e.messages)
+    d = request.get_json() or {}
+    if not d.get('email') or not d.get('password'):
+        return err('email and password required', 422)
+    r = _svc.login(d['email'], d['password'])
+    if not r['ok']: return err(r['msg'], r['code'])
+    return ok({'user': r['user'], 'access_token': r['token']})
 
-    result = _service.login(data['email'], data['password'])
-    if not result['success']:
-        return ApiResponse.error(result['message'], result.get('code', 401))
-
-    return ApiResponse.success({
-        'user':          result['user'],
-        'access_token':  result['access_token'],
-        'refresh_token': result['refresh_token'],
-    }, 'Login successful')
-
-
-@auth_bp.post('/refresh')
-def refresh():
-    body = request.get_json() or {}
-    token = body.get('refresh_token')
-    if not token:
-        return ApiResponse.error('refresh_token required', 400)
-    result = _service.refresh(token)
-    if not result['success']:
-        return ApiResponse.unauthorized(result['message'])
-    return ApiResponse.success({'access_token': result['access_token']})
-
-
-@auth_bp.post('/logout')
-@jwt_required_custom
-def logout():
-    user_id = TokenManager.get_current_user_id()
-    result  = _service.logout(user_id)
-    return ApiResponse.success(message=result['message'])
+@auth_bp.get('/me')
+@jwt_required
+def me():
+    user = User.query.get(current_user_id())
+    if not user: return err('User not found', 404)
+    return ok({'user': user.to_dict()})
